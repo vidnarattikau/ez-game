@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EZ 躲避风暴</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a15;overflow:hidden;cursor:none}canvas{display:block}#ui{position:absolute;top:20px;left:20px;color:#0ff;font-size:18px;text-shadow:0 0 10px #0ff;z-index:10}#score{font-size:28px;margin-bottom:10px}#start{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100}h1{font-size:50px;color:#0ff;text-shadow:0 0 30px #0ff;margin-bottom:30px}button{padding:15px 50px;font-size:20px;background:linear-gradient(45deg,#0ff,#00f);border:none;border-radius:30px;color:#000;font-weight:bold;cursor:pointer}button:hover{transform:scale(1.1)}
+</style>
+</head>
+<body>
+<div id="ui">
+<div id="score">分数: <span>0</span></div>
+<div>生命: <span id="hpVal">❤️❤️❤️</span></div>
+<div>波次: <span id="waveVal">1</span></div>
+</div>
+<div id="start">
+<h1>⚡ EZ 躲避风暴</h1>
+<p style="color:#888;margin-bottom:20px">鼠标右键移动 | 空格攻击 | 躲避技能</p>
+<p style="color:#666;margin-bottom:30px">存活越久波次越高</p>
+<button onclick="start()">开始游戏</button>
+</div>
+<canvas id="c"></canvas>
+<script>
+c = document.getElementById('c');
+ctx = c.getContext('2d');
+c.width = window.innerWidth;
+c.height = window.innerHeight;
+p = {x:0,y:0,s:25,speed:6};
+bullets = [];
+enemies = [];
+score = 0;
+hp = 3;
+wave = 1;
+rightDown = false;
+mx = 0;
+my = 0;
+running = false;
+document.oncontextmenu = e => e.preventDefault();
+document.onmousedown = e => {if(e.button==2)rightDown=true};
+document.onmouseup = e => {if(e.button==2)rightDown=false};
+document.onmousemove = e => {mx=e.clientX;my=e.clientY};
+
+function start(){
+  document.getElementById('start').style.display='none';
+  p.x=c.width/2;p.y=c.height/2;
+  bullets=[];enemies=[];
+  score=0;hp=3;wave=1;running=true;
+  ui();
+  setInterval(()=>{if(running&&hp>0){wave++;spawn()}},15000);
+  spawn();
+  loop();
+}
+function spawn(){
+  n = 5+wave*2;
+  for(i=0;i<n;i++)setTimeout(()=>{if(running&&hp>0)mkEnemy()},i*200);
+}
+function mkEnemy(){
+  side=Math.floor(Math.random()*4);
+  x=side==0?Math.random()*c.width:side==1?Math.random()*c.width:side==2?-20:c.width+20;
+  y=side==0?-20:side==1?c.height+20:Math.random()*c.height:Math.random()*c.height;
+  vx=(Math.random()-0.5)*4;vy=(Math.random()-0.5)*4;
+  if(side==0)vy=3+wave*0.3;
+  if(side==1)vy=-(3+wave*0.3);
+  if(side==2)vx=3+wave*0.3;
+  if(side==3)vx=-(3+wave*0.3);
+  colors=['#0ff','#ff0','#f0f','#f00'];
+  enemies.push({x,y,vx,vy,s:15+Math.random()*15,c:colors[Math.floor(Math.random()*4)]});
+}
+function loop(){
+  if(!running||hp<=0)return;
+  ctx.fillStyle='rgba(10,10,21,0.15)';
+  ctx.fillRect(0,0,c.width,c.height);
+  if(rightDown){
+    dx=mx-p.x;dy=my-p.y;d=Math.sqrt(dx*dx+dy*dy);
+    if(d>5){p.x+=dx/d*p.speed;p.y+=dy/d*p.speed;}
+  }
+  p.x=Math.max(p.s,Math.min(c.width-p.s,p.x));
+  p.y=Math.max(p.s,Math.min(c.height-p.s,p.y));
+  
+  ctx.save();ctx.translate(p.x,p.y);
+  g=ctx.createRadialGradient(0,0,0,0,0,p.s);
+  g.addColorStop(0,'#0ff');g.addColorStop(1,'#0088ff');
+  ctx.fillStyle=g;
+  ctx.beginPath();ctx.arc(0,0,p.s,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=15;ctx.shadowColor='#0ff';ctx.strokeStyle='#0ff';ctx.lineWidth=2;ctx.stroke();
+  ctx.restore();
+  
+  enemies.forEach((e,i)=>{
+    e.x+=e.vx;e.y+=e.vy;
+    ctx.save();ctx.translate(e.x,e.y);
+    g=ctx.createRadialGradient(0,0,0,0,0,e.s);
+    g.addColorStop(0,'#fff');g.addColorStop(0.5,e.c);g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;
+    ctx.beginPath();ctx.arc(0,0,e.s,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+    d=Math.sqrt((p.x-e.x)**2+(p.y-e.y)**2);
+    if(d<p.s+e.s*0.7){hp--;ui();enemies.splice(i,1);if(hp<=0)running=false;}
+    if(e.x<-50||e.x>c.width+50||e.y<-50||e.y>c.height+50){score+=10;enemies.splice(i,1);}
+  });
+  bullets.forEach((b,i)=>{
+    b.x+=b.vx;b.y+=b.vy;
+    ctx.fillStyle=b.c;
+    ctx.beginPath();ctx.arc(b.x,b.y,5,0,Math.PI*2);ctx.fill();
+    bullets=bullets.filter(bb=>bb.x>0&&bb.x<c.width&&bb.y>0&&bb.y<c.height);
+  });
+  ui();
+  requestAnimationFrame(loop);
+}
+function ui(){
+  document.querySelector('#score span').textContent=score;
+  document.getElementById('hpVal').textContent='❤️'.repeat(hp);
+  document.querySelector('#waveVal').textContent=wave;
+}
+window.onresize=()=>{c.width=window.innerWidth;c.height=window.innerHeight};
+</script>
+</body>
+</html>
